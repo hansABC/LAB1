@@ -1,0 +1,220 @@
+/*
+ * File:   Laboratorio1.c
+ * Author: hansb
+ *
+ * Created on 23 de enero de 2020, 03:24 PM
+ */
+
+
+// PIC16F887 Configuration Bit Settings
+
+// 'C' source line config statements
+
+// CONFIG1
+#pragma config FOSC = INTRC_NOCLKOUT// Oscillator Selection bits (INTOSCIO oscillator: I/O function on RA6/OSC2/CLKOUT pin, I/O function on RA7/OSC1/CLKIN)
+#pragma config WDTE = OFF       // Watchdog Timer Enable bit (WDT disabled and can be enabled by SWDTEN bit of the WDTCON register)
+#pragma config PWRTE = OFF      // Power-up Timer Enable bit (PWRT disabled)
+#pragma config MCLRE = OFF      // RE3/MCLR pin function select bit (RE3/MCLR pin function is digital input, MCLR internally tied to VDD)
+#pragma config CP = OFF         // Code Protection bit (Program memory code protection is disabled)
+#pragma config CPD = OFF        // Data Code Protection bit (Data memory code protection is disabled)
+#pragma config BOREN = OFF      // Brown Out Reset Selection bits (BOR disabled)
+#pragma config IESO = OFF       // Internal External Switchover bit (Internal/External Switchover mode is disabled)
+#pragma config FCMEN = OFF      // Fail-Safe Clock Monitor Enabled bit (Fail-Safe Clock Monitor is disabled)
+#pragma config LVP = OFF        // Low Voltage Programming Enable bit (RB3 pin has digital I/O, HV on MCLR must be used for programming)
+
+// CONFIG2
+#pragma config BOR4V = BOR40V   // Brown-out Reset Selection bit (Brown-out Reset set to 4.0V)
+#pragma config WRT = OFF        // Flash Program Memory Self Write Enable bits (Write protection off)
+
+// #pragma config statements should precede project file includes.
+// Use project enums instead of #define for ON and OFF.
+
+#define _XTAL_FREQ 4000000
+
+#include <xc.h>
+#include <pic16f887.h>
+
+//*******************************************************************************************************************************
+//            PROTOTIPOS DE FUNCIONES (VARIABLES)
+//*******************************************************************************************************************************
+void iniciar(void);   // Prototipo para inicializar los puertos
+char estados;         // Prototipo de las variables utilizadas        
+char contadorJ1;
+char contadorJ2;
+char ledJ1;
+char ledJ2;
+char antiJ1;
+char antiJ2;
+
+
+//******************************************************************************************************************************
+//            FUNCIÓN PRINCIPAL
+//******************************************************************************************************************************
+
+void main(void) {
+    iniciar();          //Llamar a la función de inicializar los puertos
+    
+    PORTA=0;            // Todos los puertos con valor de cero
+    PORTB=0;
+    PORTC=0;
+    PORTD=0;
+    PORTE=0;
+    
+    estados=0;          //Todas las variables con valor de cero
+    contadorJ1=0;
+    contadorJ2=0;
+    ledJ2=0;
+    ledJ1=0;
+    antiJ1=0;
+    antiJ2=0;
+    
+    unsigned int numerosDisp[]={     //Definición de Array de 7 segmentos
+        0X7E,   //NUMERO CERO
+        0X18,   //NUMERO UNO
+        0X6D,   //NUMERO DOS
+        0X3D,   // NUMERO TRES     
+    };
+    
+    unsigned int contadorDec[]={     //Array del contador de décadas
+        0b00000000,
+        0b00000001,
+        0b00000010,
+        0b00000100,
+        0b00001000,
+        0b00010000,
+        0b00100000,
+        0b01000000,
+        0b10000000,
+    };
+    
+    while(estados==0b00000000){     //While para el primer estado, el cual se utiliza únicamente para el semáforo de inicio
+        if(PORTDbits.RD6==1){       //Revisa si se presiona el boton de Start
+            PORTC=numerosDisp[3];   //Se envia al Display el valor del array correspondiente al numero tres
+            PORTEbits.RE0=1;        //Se enciende la primera led del semáforo
+            __delay_ms(1000);
+
+            PORTC=numerosDisp[2];   //Se envia al Display el valor del array correspondiente al numero dos
+            PORTEbits.RE1=1;        //Se enciende la segunda led del semáforo
+            __delay_ms(1000);   
+
+            PORTC=numerosDisp[1];   //Se envia al Display el valor del array correspondiente al numero uno
+            PORTEbits.RE2=1;        //Se enciende la tercera led del semáforo
+             __delay_ms(1000);
+
+             PORTC=numerosDisp[0];  //Se envia al Display el valor del array correspondiente al numero cero
+             __delay_ms(500);
+             PORTC=0;               //Se apaga el display y las leds del semáforo
+             PORTEbits.RE0=0;
+             PORTEbits.RE1=0;
+             PORTEbits.RE2=0;
+
+             estados=0b00000010;    //Se cambia la variable de estados. Esto nos saca del while y nos introduce al segundo  
+
+        }
+    }          
+    
+            
+    
+    while(estados==0b00000010){         //While para el segundo estado, el cual se utiliza para la modalidad de juego
+        if(PORTDbits.RD4==1){           //Jugador 1. Primero se realiza el anti rebote
+            antiJ1=1;                   //Al presionar el boton del J1, se prende una bandera
+            __delay_ms(20);             
+            
+            if(PORTDbits.RD4==0&antiJ1==1){         //Revisa si la bandera esta encendida y el botón apagado para ejecutar el código
+                contadorJ1=contadorJ1+1;            //Se aumenta un contador para J1
+                ledJ1=contadorDec[contadorJ1];      //Se guardará en la variable ledJ1 la posición del contador de decádas que corresponde al contadorJ1
+                antiJ1=0;                           //Se apaga la bandera del antirebote
+                PORTB=ledJ1;                        //Se envia el valor de ledJ1 al puerto B
+            }else{
+                PORTB=ledJ1;                        //En caso el J1 no haya presionado el botón, se matendra encendido el puerto B con el último valor
+
+            }
+        }
+        
+        if(contadorJ1==8){                          //Cuando el contador llega a 8, se apaga el puerto del contador de décadas
+            PORTB=0;                                
+            estados=0b00000011;                     //Cambia la variable de estados para entrar al while cuando gana el jugador 1
+
+        }
+        if(PORTDbits.RD5==1){          //Jugador 2
+            antiJ2=1;                  //Se sigue la misma lógica del J1 para el jugador 2
+            __delay_ms(20);
+            
+            if(PORTDbits.RD5==0&antiJ2==1){
+                contadorJ2=contadorJ2+1;
+                ledJ2=contadorDec[contadorJ2];
+                antiJ2=0;
+                PORTA=ledJ2;
+            }else{
+                PORTA=ledJ2;
+                
+            }
+        }
+        if(contadorJ2==8){
+            PORTA=0;
+            estados=0b00000111;
+        }
+    }
+       
+       
+    
+   
+    while(estados==0b00000011){         //While cuando gana el jugador 1
+        PORTDbits.RD7=1;                //Enciende la led ganador del J1
+        PORTC=numerosDisp[1];           //Muestra el número 1 en el Display indicando que gano el jugador uno
+        if (PORTDbits.RD6==1){          //Revisa si se presiona el botón de start para reiniciar todo y cambiar nuevamente la variable de estados
+            contadorJ1=0;
+            contadorJ2=0;
+            ledJ1=0;
+            ledJ2=0;
+            PORTC=0;
+            estados=0b00000000;
+        }
+    }
+   
+   while (estados==0b00000111){         //While cuando gana el jugador 2
+        PORTCbits.RC7=1;                //Enciende la led ganador del J2 
+        PORTC=numerosDisp[2];           //Muestra el número 2 en el display inidicando que gano el jugador dos
+        if (PORTDbits.RD6==1){          //Revisa si se presiona el botón de start para reiniciar todo y cambiar nuevamente la variable de estados
+            contadorJ1=0;
+            contadorJ2=0;
+            ledJ1=0;
+            ledJ2=0;
+            PORTC=0;
+            estados=0b00000000;     
+        }
+    }
+   
+     return;
+        
+    }
+   
+    
+    
+    
+    
+   
+
+
+
+
+
+
+
+//*******************************************************************************************************************************
+//        DECLARACIÓN DE FUNCIONES
+//*******************************************************************************************************************************
+void iniciar(void){                 //CONFIGURACIÓN DE PUERTOS 
+    TRISC=0;
+    TRISB=0;
+    TRISA=0;
+    TRISEbits.TRISE0=0;
+    TRISEbits.TRISE1=0;
+    TRISEbits.TRISE2=0;
+    TRISDbits.TRISD4=1;
+    TRISDbits.TRISD5=1;
+    TRISDbits.TRISD6=1;
+    TRISDbits.TRISD7=0;
+    ANSEL=0;
+    ANSELH=0;
+}
